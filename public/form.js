@@ -11,7 +11,7 @@ const state=(text,err=false)=>{ $('wordStatus').className=err?'alert':'ok';$('wo
 function dateROC(iso){let m=String(iso||'').match(/^(\d{4})-(\d\d)-(\d\d)$/);return m?(+m[1]-1911)+'年'+(+m[2])+'月'+(+m[3])+'日':''}
 function renderCodes(){const d=$('baOptions');d.replaceChildren();codes.forEach(c=>{let lab=document.createElement('label');lab.style.cssText='display:inline-flex;align-items:center;gap:4px;border:1px solid #b6ceb9;border-radius:8px;margin:0;padding:6px;font-weight:400;font-size:13px';let cb=document.createElement('input');cb.type='checkbox';cb.style.cssText='width:16px;height:16px';cb.checked=checked.has(c);cb.onchange=()=>cb.checked?checked.add(c):checked.delete(c);lab.append(cb,document.createTextNode(c));d.append(lab)})}
 function renderFormText(){const d=$('formNarratives');d.replaceChildren();KEY.forEach((k,i)=>{let box=document.createElement('div');box.className='edit';let h=document.createElement('h3');h.textContent=(i+1)+'、'+LABEL[i];let t=document.createElement('textarea');t.rows=4;t.placeholder='尚未提供本段事實，留白即可';t.value=formText[k]||'';t.addEventListener('input',()=>formText[k]=t.value);box.append(h,t);d.append(box)})}
-function inherit(){KEY.forEach(k=>formText[k]=record[k]||'');renderFormText();$('fDate').value=$('date').value;$('fWho').value=$('who').value;$('fName').value=$('case').selectedOptions[0]?.textContent?.split('（')[0]||'';const selected=caseRows.find(x=>x.key===$('case').value);$('fCaseId').value=selected?.official_code_matched?selected.code:'';state('已帶入四段紀錄；請確認資料後再套印。')}
+function inherit(){KEY.forEach(k=>formText[k]=record[k]||'');renderFormText();$('fDate').value=$('date').value;$('fWho').value=$('who').value;const selected=caseRows.find(x=>x.key===$('case').value);if(selected?.label)$('fName').value=selected.label;if(selected?.official_code_matched)$('fCaseId').value=selected.code;state('已帶入四段紀錄；請確認資料後再套印。')}
 $('copyNarratives').onclick=inherit;
 $('templateFile').onchange=async e=>{template=null;const f=e.target.files?.[0];if(!f)return;if(!/\.docx$/i.test(f.name)){state('僅接受 Word .docx 範本',true);return}try{
   const buf=await f.arrayBuffer();const zip=await JSZip.loadAsync(buf);
@@ -53,9 +53,9 @@ function toggleChecks(tc,active){
 function stamp(doc){
  const root=sub(doc,'tbl')[0],rows=q(root,'tr'),cell=(r,c)=>q(rows[r],'tc')[c];
  // 以原 Word 的實體儲存格順序套印，不另外重建表格。
- setCell(doc,cell(0,1),$('fCaseId').value||'TEST');
+ setCell(doc,cell(0,1),$('fCaseId').value||'');
  setCell(doc,cell(0,3),dateROC($('fDate').value));
- setCell(doc,cell(1,1),$('fName').value||'模擬個案');
+ setCell(doc,cell(1,1),$('fName').value||'');
  setCell(doc,cell(1,3),$('fWho').value||'');
  setCell(doc,cell(2,1),$('fDob').value||'');
  setCell(doc,cell(2,3),''); // 測試站不收身分證字號
@@ -81,8 +81,9 @@ function stamp(doc){
  // 全文件進一步清除來源範例中的可識別資料（使用者提供的示例姓名與證號）。
  // 禁止已填紀錄作為範本；不以特定個案姓名做不完整的去識別處理。
 }
-$('downloadWord').onclick=async()=>{if(!template){state('請先上傳永護寧 Word .docx 範本',true);return}
- if(!Object.values(formText).some(v=>v.trim())){state('請先從 AI 紀錄帶入四段文字，或手動填寫。',true);return}
+$('downloadWord').onclick=async()=>{if(!template){state('請先選擇「空白家訪 Word 範本」，不能使用已填寫個案的家訪檔案。',true);$('templateFile').focus();return}
+ if(!Object.values(formText).some(v=>v.trim())&&Object.values(record).some(v=>String(v||'').trim()))inherit();
+ if(!Object.values(formText).some(v=>v.trim())){state('請先在上方「④ AI 整理與修正」填寫文字，或從 AI 紀錄帶入。',true);return}
  try{
  const zip=await JSZip.loadAsync(template);
  const xml=await zip.file('word/document.xml').async('string');
@@ -104,5 +105,5 @@ function preview(){
  w.document.write('<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>家訪預覽</title><style>body{font-family:serif;padding:25px;line-height:1.65;color:#111}@media print{body{padding:0}}</style></head><body>'+content+'<p><button onclick="window.print()">列印此預覽</button></p></body></html>');w.document.close();
 }
 $('previewForm').onclick=preview;
-renderCodes();renderFormText();$('fDate').value=$('date').value;$('fName').value='模擬個案 A';
+renderCodes();renderFormText();$('fDate').value=$('date').value;$('fName').value='';
 })();
