@@ -4,7 +4,7 @@ export const methods=['GET','POST'];
 export default async function(req,res){
  const member=req.member.id;
  if(req.method==='GET'){
-  const {rows}=await db.query("SELECT id::text AS key,case_code AS code,display_name AS label,status FROM yhn_visit_cases WHERE member_id=$1 ORDER BY display_name LIMIT 500",[member]);
+  const {rows}=await db.query("SELECT id::text AS key,case_code AS code,display_name AS label,status,supervisor,service_status,service_type,monthly_plan,official_code_matched,source_version FROM yhn_visit_cases WHERE member_id=$1 ORDER BY display_name LIMIT 500",[member]);
   return res.json({cases:rows,scope:'member',formal:false});
  }
  const x=req.body||{},code=String(x.case_code||'').trim(),name=String(x.display_name||'').trim();
