@@ -38,7 +38,7 @@ $('caseBaseFile').addEventListener('change',()=>{pending=null;$('submitImport').
 $('checkImport').onclick=async()=>{
  $('submitImport').disabled=true;pending=null;
  const rosterFile=$('rosterFile').files?.[0],baseFile=$('caseBaseFile').files?.[0];
- if(!rosterFile||!baseFile)return set('請選擇最新家電訪清冊與10月個案總表。',true);
+ if(!rosterFile||!baseFile)return set('需選擇兩份 Excel：最新家電訪清冊 .xlsm ＋ 10月個案總表 .xlsx。V2 JSON 備份不能代替清冊。',true);
  $('checkImport').disabled=true;set('正在本機核對兩份個案名冊…');
  try{
   const [roster,base]=await Promise.all([excelRows(rosterFile),excelRows(baseFile)]);
@@ -65,7 +65,7 @@ $('checkImport').onclick=async()=>{
    all.push({code,label:name,supervisor:trim(r[1]),service_type:trim(r[3]),service_status:trim(r[4]),
        official_code_matched:isMatched,monthly_plan:plan});
   }
-  if(all.length!==140||matched!==117||pendingCount!==23)throw Error('名冊基準不符合本次核對結果（140人／117人配對／23人待核對），未執行匯入。');
+  if(all.length!==140||matched!==117||pendingCount!==23)throw Error('目前讀到清冊 '+all.length+' 人、衛福案號配對 '+matched+' 人、待核對 '+pendingCount+' 人；本次確認主檔應為 140／117／23，請確認檔案是否為最新版。');
   pending={cases:all,source_version:'（玉）115 家電訪清冊最新一版(3).xlsm'};
   $('submitImport').disabled=false;
   set('核對完成：家電訪清冊 140 位；已對上衛福案號 117 位；案號待核對 23 位。10月已排訪視 '+month10+' 位；11、12月來源未提供，不補填。點「確認後寫入」才會更新資料庫。');
@@ -79,7 +79,7 @@ $('submitImport').onclick=async()=>{
  try{
   const res=await fetch('/api/import-cases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pending)});
   const data=await res.json().catch(()=>({}));
-  if(!res.ok||data.saved!==true||data.total!==pending.cases.length)throw Error(data.error||'資料庫未確認完整寫入');
+  if(!res.ok||data.saved!==true||data.total!==pending.cases.length)throw Error(res.status===401?'沒有資料庫登入權限：需用 Hatchable 專案成員帳號登入，網站開啟成功不代表能儲存。':(data.error||'資料庫未確認完整寫入'));
   set('✅ 資料庫已核實寫入 '+data.total+' 位；衛福案號對照 '+data.official_match+' 位、待核對 '+data.provisional+' 位。既有訪視資料保留。');
   await refreshCases();
  }catch(e){set('匯入失敗，不顯示成功：'+e.message,true)}
