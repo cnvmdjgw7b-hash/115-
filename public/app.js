@@ -59,4 +59,38 @@ $('save').onclick=save;
 function history(){$('historyList').replaceChildren();let h=[...getVisits()].reverse();if(!h.length){$('historyList').textContent='沒有已儲存的歷史紀錄';return}h.forEach((v,i)=>{let d=document.createElement('div');d.className='card';let title=document.createElement('strong');title.textContent=v.date+'｜'+v.type;let b=document.createElement('button');b.className='secondary';b.style.marginLeft='12px';b.textContent='開啟參考';b.onclick=()=>{record={...v.record};drawRecord();nav('draft');status('已開啟歷史紀錄供參考；不會自動視為本次事實。')};d.append(title,b);$('historyList').append(d)})}
 $('export').onclick=()=>{let s='永護寧｜家電訪去識別化測試草稿\n'+$('date').value+' '+type+'\n'+keys.map((k,i)=>(i+1)+'、'+titles[i]+'\n'+record[k]).join('\n\n')+'\n\n草稿僅供督導覆核，不是正式紀錄。';let a=document.createElement('a'),url=URL.createObjectURL(new Blob([s],{type:'text/plain;charset=utf-8'}));a.href=url;a.download='永護寧_家電訪測試草稿.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),500)};
 function reset(){chosen=new Set();record={condition:'',service:'',response:'',action:''};$('extra').value='';$('actions').value='';$('source').value='';$('filter').value='';$('warnings').replaceChildren();$('status').textContent='';renderCats();renderOptions();drawRecord()}
-$('case').onchange=()=>{reset();loadVisits()};$('date').value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);renderCats();renderOptions();drawRecord();
+$('case').onchange=()=>{reset();if($('case').value)loadVisits()};$('date').value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);renderCats();renderOptions();drawRecord();
+let caseRows=[];
+function showCases(search=''){
+ const current=$('case').value;
+ const rows=caseRows.filter(c=>(c.label+' '+c.code).includes(search.trim()));
+ $('case').replaceChildren();
+ if(!rows.length){let o=new Option(search?'找不到符合個案':'尚未建立個案','');$('case').add(o);}
+ else rows.forEach(c=>$('case').add(new Option(c.label+'（'+c.code+'）',c.key)));
+ if(rows.some(c=>c.key===current))$('case').value=current;
+ else if(rows.length){$('case').value=rows[0].key;reset();loadVisits();}
+ else $('case').value='';
+ $('caseInfo').textContent=rows.length?'已讀取 '+rows.length+' 位個案；資料來源狀態：待核對。':'尚無個案資料，可新增個案。';
+}
+async function refreshCases(){
+ try{
+  const r=await fetch('/api/cases',{cache:'no-store'}),data=await r.json();
+  if(!r.ok||!Array.isArray(data.cases))throw Error(data.error||'讀取失敗');
+  caseRows=data.cases;showCases($('caseSearch').value);
+ }catch(e){$('caseInfo').textContent='個案名冊讀取失敗：'+e.message;}
+}
+$('caseSearch').oninput=()=>showCases($('caseSearch').value);
+$('createCase').onclick=async()=>{
+ const code=$('caseCode').value.trim(),name=$('caseName').value.trim(),out=$('caseCreateStatus');
+ if(!/^[A-Za-z0-9_-]{2,40}$/.test(code)||!name)return out.textContent='請填寫有效案號與姓名';
+ $('createCase').disabled=true;out.textContent='正在新增個案…';
+ try{
+  const res=await fetch('/api/cases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({case_code:code,display_name:name})});
+  const data=await res.json();
+  if(!res.ok||data.saved!==true)throw Error(data.error||'新增失敗');
+  $('caseSearch').value='';await refreshCases();$('case').value=data.case.key;reset();await loadVisits();
+  out.textContent='個案已建檔（待核對），可開始建立家電訪紀錄。';
+ }catch(e){out.textContent='新增失敗：'+e.message}
+ finally{$('createCase').disabled=false}
+};
+refreshCases();
