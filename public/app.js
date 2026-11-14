@@ -31,8 +31,8 @@ async function loadVisits(){
   if($('case').value===key){if(active==='history')history();if(active==='facts')tracking()}
  }catch(e){loaded[key]=false;if(active==='history')$('historyList').textContent='伺服器讀取失敗：'+e.message;if(active==='facts')$('track').textContent='無法載入前次追蹤：'+e.message}
 }
-function nav(p){active=p;document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===p));document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));if(p==='history'){history();loadVisits()}if(p==='facts'){tracking();loadVisits()}if(p==='draft')drawRecord();window.scrollTo(0,0)}
-document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>nav(b.dataset.page));document.querySelectorAll('[data-next]').forEach(b=>b.onclick=()=>nav(b.dataset.next));document.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{type=b.dataset.type;document.querySelectorAll('[data-type]').forEach(x=>x.classList.toggle('chosen',x===b))});
+function nav(p){active=p;if(p==='history'){history();loadVisits()}if(p==='facts'){tracking();if($('case').value)loadVisits()}if(p==='draft')drawRecord();const el=p==='facts'?$('facts'):p==='draft'?$('draft'):document.getElementById(p);el?.scrollIntoView({behavior:'smooth',block:'start'});}
+document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>nav(b.dataset.page));document.querySelectorAll('[data-next]').forEach(b=>b.onclick=()=>nav(b.dataset.next));document.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{type=b.dataset.type;document.querySelectorAll('[data-type]').forEach(x=>x.classList.toggle('chosen',x===b));$('form').style.display=type==='家訪'?'block':'none';$('phone').style.display=type==='電訪'?'block':'none';if(type==='家訪'){$('fDate').value=$('date').value;}else{$('pDate').value=$('date').value;}});
 function renderCats(){let q=$('filter').value.trim();$('categories').innerHTML='';Object.keys(CATS).filter(k=>!q||k.includes(q)||CATS[k].some(s=>s.includes(q))).forEach(k=>{let b=document.createElement('button');b.className='chip'+(k===category?' active':'');b.textContent=k;b.onclick=()=>{category=k;renderCats();renderOptions()};$('categories').append(b)})}
 function renderOptions(){let q=$('filter').value.trim();$('options').innerHTML='';(CATS[category]||[]).filter(v=>!q||v.includes(q)||category.includes(q)).forEach(v=>{let l=document.createElement('label');l.className='opt';let c=document.createElement('input');c.type='checkbox';c.checked=chosen.has(v);c.onchange=()=>{c.checked?chosen.add(v):chosen.delete(v);$('picked').textContent='已選 '+chosen.size+' 項：'+[...chosen].join('、')};l.append(c,document.createTextNode(v));$('options').append(l)});$('picked').textContent='已選 '+chosen.size+' 項：'+[...chosen].join('、')}
 $('filter').oninput=()=>{const q=$('filter').value.trim();if(q){let found=Object.keys(CATS).find(k=>k.includes(q)||CATS[k].some(s=>s.includes(q)));if(found)category=found}renderCats();renderOptions()};
@@ -40,18 +40,18 @@ function tracking(){let history=getVisits();let t=history.flatMap(v=>v.pending||
 function drawRecord(){$('fields').replaceChildren();keys.forEach((key,i)=>{let d=document.createElement('div');d.className='edit';let h=document.createElement('h3');h.textContent=(i+1)+'、'+titles[i];let t=document.createElement('textarea');t.value=record[key];t.placeholder='尚未提供本段事實；留白即可';t.oninput=()=>record[key]=t.value;d.append(h,t);$('fields').append(d)})}
 function status(s,err=false){$('status').className=err?'alert':'ok';$('status').textContent=s}
 function check(){let list=[];if(chosen.has('服務滿意')&&chosen.has('服務不滿意'))list.push('服務滿意與不滿意同時勾選，請確認時間及來源');if(chosen.has('可自行洗澡')&&chosen.has('洗澡需協助'))list.push('洗澡能力描述可能矛盾');if(chosen.has('住院')&&chosen.has('出院恢復'))list.push('請確認住院／出院日期及服務是否實際恢復');return list}
-$('generate').onclick=async()=>{let facts=[...chosen],extra=$('extra').value.trim(),actions=$('actions').value.trim();if(!facts.length&&!extra){status('請先提供本次訪視事實。',true);return}if(Object.values(record).some(v=>v.trim())&&!confirm('重新生成會取代目前四段文字，確定嗎？'))return;const warn=check();$('warnings').replaceChildren();warn.forEach(w=>{let d=document.createElement('div');d.className='alert';d.textContent='⚠ '+w;$('warnings').append(d)});status('AI 正在整理去識別化草稿…');$('generate').disabled=true;try{const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({visitType:type,who:$('who').value,source:$('source').value,facts,extra,actions,tracking:getVisits().flatMap(v=>v.pending||[]).slice(-6)})});const x=await res.json();if(!res.ok)throw Error(x.error||'生成失敗');record=x.record;drawRecord();(x.warnings||[]).forEach(w=>{let d=document.createElement('div');d.className='alert';d.textContent='⚠ '+w;$('warnings').append(d)});status('AI 草稿已產生，請逐段核對；尚非正式訪視紀錄。')}catch(e){status(e.message,true)}finally{$('generate').disabled=false}};
+$('generate').onclick=async()=>{let facts=[...chosen],extra=$('extra').value.trim(),actions=$('actions').value.trim();if(!facts.length&&!extra){status('請先提供本次訪視事實。',true);return}if(Object.values(record).some(v=>v.trim())&&!confirm('重新生成會取代目前四段文字，確定嗎？'))return;const warn=check();$('warnings').replaceChildren();warn.forEach(w=>{let d=document.createElement('div');d.className='alert';d.textContent='⚠ '+w;$('warnings').append(d)});status('AI 正在整理去識別化草稿…');$('generate').disabled=true;try{const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({visitType:type,who:$('who').value,source:$('source').value,facts,extra,actions,tracking:getVisits().flatMap(v=>v.pending||[]).slice(-6)})});const x=await res.json();if(!res.ok)throw Error(x.error||'生成失敗');record=x.record;drawRecord();if(type==='家訪')$('copyNarratives')?.click();else $('pImportAI')?.click();(x.warnings||[]).forEach(w=>{let d=document.createElement('div');d.className='alert';d.textContent='⚠ '+w;$('warnings').append(d)});status('AI 草稿已產生，請逐段核對；尚非正式訪視紀錄。')}catch(e){status(e.message,true)}finally{$('generate').disabled=false}};
 async function save(){
  if(!Object.values(record).some(x=>x.trim()))return status('尚無可儲存的紀錄',true);
  let pending=$('actions').value.split(/[\n；]/).map(x=>x.trim()).filter(x=>/待|後續|追蹤|確認/.test(x)).slice(0,8);
  const payload={case_key:$('case').value,date:$('date').value,type,who:$('who').value,source:$('source').value,facts:[...chosen],extra:$('extra').value,actions:$('actions').value,record:{...record},pending};
- $('save').disabled=true;status('正在儲存至測試資料庫…');
+ $('save').disabled=true;status('正在儲存本次訪視…');
  try{
   const res=await fetch('/api/visits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const data=await res.json().catch(()=>({}));
   if(!res.ok||data.saved!==true||!data.visit?.id)throw Error(data.error||'伺服器未確認儲存');
   await loadVisits();
-  status('已儲存至私人測試資料庫；紀錄編號：'+data.visit.id.slice(0,8)+'（非正式主檔）');
+  status('已儲存訪視草稿；紀錄編號：'+data.visit.id.slice(0,8));
  }catch(e){status('儲存失敗，未寫入資料庫：'+e.message,true)}
  finally{$('save').disabled=false}
 }
@@ -75,7 +75,7 @@ function showCases(search=''){
 async function refreshCases(){
  try{
   const r=await fetch('/api/cases',{cache:'no-store'}),data=await r.json();
-  if(!r.ok||!Array.isArray(data.cases))throw Error(data.error||'讀取失敗');
+  if(!r.ok||!Array.isArray(data.cases))throw Error(r.status===401?'帳號尚無 Hatchable 專案成員權限，請使用專案登入帳號開啟網站。':(data.error||'讀取失敗'));
   caseRows=data.cases;showCases($('caseSearch').value);
  }catch(e){$('caseInfo').textContent='個案名冊讀取失敗：'+e.message;}
 }
