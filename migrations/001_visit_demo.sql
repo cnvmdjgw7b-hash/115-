@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS yhn_demo_visits (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ member_id TEXT NOT NULL,
+ case_key TEXT NOT NULL CHECK (case_key IN ('A','B')),
+ visit_date DATE NOT NULL,
+ visit_type TEXT NOT NULL CHECK (visit_type IN ('家訪','電訪')),
+ interviewee TEXT NOT NULL,
+ source_note TEXT NOT NULL DEFAULT '',
+ facts JSONB NOT NULL DEFAULT '[]'::jsonb,
+ extra_note TEXT NOT NULL DEFAULT '',
+ action_note TEXT NOT NULL DEFAULT '',
+ record_body JSONB NOT NULL,
+ pending_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+ status TEXT NOT NULL DEFAULT 'draft' CHECK (status = 'draft'),
+ revision INTEGER NOT NULL DEFAULT 1,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ CONSTRAINT yhn_demo_visits_record_object CHECK (jsonb_typeof(record_body)='object'),
+ CONSTRAINT yhn_demo_visits_pending_array CHECK (jsonb_typeof(pending_items)='array'),
+ CONSTRAINT yhn_demo_visits_facts_array CHECK (jsonb_typeof(facts)='array')
+)
