@@ -74,9 +74,22 @@ function stamp(doc){
  const paragraphs=KEY.map((k,i)=>(['一','二','三','四'][i])+'、'+LABEL[i]+'\n'+(formText[k]||'')).join('\n\n');
  const target=cell(10,1),ps=q(target,'p');
  // 正式範本的四個標題與四個內容段落各自有原生字級與行距。
- if(ps.length<8)throw Error('缺少正式家訪四段處遇欄位');
+ if(ps.length<8){
+   // 接受 Word 原表單不同存檔方式：有些版本把四段內容壓在同一段。
+   // 不讓使用者再次輸入同一份紀錄，改以原儲存格建立四組標題與內容段落。
+   const base=ps[0]||doc.createElementNS(NS,'w:p');
+   if(!ps.length)target.appendChild(base);
+   for(const node of [...target.childNodes])if(node.localName==='p')target.removeChild(node);
+   for(let i=0;i<8;i++){
+     const paragraph=base.cloneNode(true);
+     for(const n of [...paragraph.childNodes])if(n.localName!=='pPr')paragraph.removeChild(n);
+     target.appendChild(paragraph);
+   }
+ }
+ const usePs=q(target,'p');
+ const headers=['一、個案狀況','二、服務情形','三、個案及家屬回應','四、處遇計畫'];
  function putP(p,value){let r=sub(p,'r')[0]?.cloneNode(true)||doc.createElementNS(NS,'w:r');for(const n of [...r.childNodes])if(n.localName!=='rPr')n.remove();for(const n of [...p.childNodes])if(n.localName!=='pPr')n.remove();let t=doc.createElementNS(NS,'w:t');t.setAttribute('xml:space','preserve');t.textContent=value||'';r.appendChild(t);p.appendChild(r);}
- KEY.forEach((key,i)=>putP(ps[i*2+1],formText[key]||''));
+ KEY.forEach((key,i)=>{putP(usePs[i*2],headers[i]);putP(usePs[i*2+1],formText[key]||'')});
  // 只在督導簽核欄下方填入代稱，不覆蓋標籤及主管欄。\n if(q(rows[12],'tc')[0])setCell(doc,cell(12,0),$('fSupervisor').value||'');
  // 全文件進一步清除來源範例中的可識別資料（使用者提供的示例姓名與證號）。
  // 禁止已填紀錄作為範本；不以特定個案姓名做不完整的去識別處理。
@@ -90,7 +103,18 @@ $('downloadWord').onclick=async()=>{if(!template){state('請先選擇「空白�
  const doc=new DOMParser().parseFromString(xml,'application/xml');stamp(doc);
  zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
  // 移除可能包含舊個案姓名的附加個人資訊 metadata。
- // 保留 docProps/core.xml；移除會造成 DOCX 結構不完整。
+ // 修復先前匯出 DOCX 缺少 core.xml 導致 Word 無法開啟的問題。
+ if(!zip.file('docProps/core.xml')){
+   zip.file('docProps/core.xml','<?xml version="1.0" encoding="UTF-8"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>永護寧家訪紀錄表</dc:title></cp:coreProperties>');
+ }
+ const typesFile=zip.file('[Content_Types].xml');
+ if(typesFile){let types=await typesFile.async('string');
+   if(!types.includes('PartName="/docProps/core.xml"')){
+     types=types.replace('</Types>','<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>');
+     zip.file('[Content_Types].xml',types);
+   }
+ }
+ // 保留套印來源的原始版型和表格；不擅自變更量表題目。
  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download='永護寧_家訪固定欄位套印_測試版.docx';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
