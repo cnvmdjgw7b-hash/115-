@@ -1,0 +1,7 @@
+ALTER TABLE yhn_visit_cases
+ ADD COLUMN IF NOT EXISTS supervisor TEXT,
+ ADD COLUMN IF NOT EXISTS service_type TEXT,
+ ADD COLUMN IF NOT EXISTS service_status TEXT,
+ ADD COLUMN IF NOT EXISTS monthly_plan JSONB NOT NULL DEFAULT '{}'::jsonb,
+ ADD COLUMN IF NOT EXISTS official_code_matched BOOLEAN NOT NULL DEFAULT false,
+ ADD COLUMN IF NOT EXISTS source_version TEXT;
