@@ -1,0 +1,1 @@
+ALTER TABLE yhn_demo_visits DROP CONSTRAINT IF EXISTS yhn_demo_visits_case_key_check
