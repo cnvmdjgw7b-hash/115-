@@ -63,14 +63,24 @@ $('pImportAI').onclick=()=>{
 };
 function stamp(doc){
  const rows=direct(get(doc,'tbl')[0],'tr'),cell=(r,c)=>direct(rows[r],'tc')[c];
- put(doc,cell(0,1),selected('pCaseId')||'TEST');
+ put(doc,cell(0,1),selected('pCaseId')||'');
  put(doc,cell(0,3),roc(selected('pDate')));
  put(doc,cell(1,1),(selected('pInterviewee')==='案主'?'■案主　□家屬':'□案主　■家屬（'+selected('pInterviewee')+'）'));
  put(doc,cell(1,3),selected('pChannel'));
  mark(cell(2,1),picks.pServices);
  mark(cell(2,3),new Set(selected('pLanguage')==='未確認'?[]:[selected('pLanguage')]));
  mark(cell(5,0),picks.pContact);
- mark(cell(5,1),new Set([selected('pAwareness'),selected('pHealth')].filter(Boolean)));
+ const mental=get(cell(5,1),'p');
+ // 「尚可」同時存在意識表達與健康情形，分段勾選避免兩項互相影響。
+ function markParagraphRange(start,end,selectedValue){
+  for(let i=start;i<=end;i++)if(mental[i]){
+   const tmp=doc.createElementNS(NS,'w:tc');tmp.appendChild(mental[i].cloneNode(true));
+   mark(tmp,new Set(selectedValue?[selectedValue]:[]));
+   const newPara=direct(tmp,'p')[0];mental[i].parentNode.replaceChild(newPara,mental[i]);
+  }
+ }
+ markParagraphRange(1,3,selected('pAwareness'));
+ markParagraphRange(5,8,selected('pHealth'));
  mark(cell(5,2),new Set([selected('pArrival'),selected('pExecution'),selected('pAttitude'),...picks.pBehavior].filter(Boolean)));
  put(doc,cell(7,0),selected('pNotes'));
  if(direct(rows[9],'tc').length>=2){put(doc,cell(9,0),selected('pVisitor'));put(doc,cell(9,1),selected('pSupervisor'));}
