@@ -66,11 +66,11 @@ function showCases(search=''){
  const rows=caseRows.filter(c=>(c.label+' '+c.code).includes(search.trim()));
  $('case').replaceChildren();
  if(!rows.length){let o=new Option(search?'找不到符合個案':'尚未建立個案','');$('case').add(o);}
- else rows.forEach(c=>$('case').add(new Option(c.label+'（'+c.code+'）',c.key)));
+ else rows.forEach(c=>$('case').add(new Option(c.label+'（'+(c.official_code_matched?c.code:'案號待核對')+'）',c.key)));
  if(rows.some(c=>c.key===current))$('case').value=current;
  else if(rows.length){$('case').value=rows[0].key;reset();loadVisits();}
  else $('case').value='';
- $('caseInfo').textContent=rows.length?'已讀取 '+rows.length+' 位個案；資料來源狀態：待核對。':'尚無個案資料，可新增個案。';
+ const selected=rows.find(c=>c.key===$('case').value);$('caseInfo').textContent=selected?'名冊 '+rows.length+' 位｜主責督導：'+(selected.supervisor||'未核對')+'｜狀態：'+(selected.service_status||'未核對')+'｜案號：'+(selected.official_code_matched?'已對照':'待核對')+'｜1至10月訪視規劃已存檔。':(rows.length?'名冊 '+rows.length+' 位。':'尚無個案資料，可新增個案。');
 }
 async function refreshCases(){
  try{
