@@ -8,6 +8,10 @@ root.append(box);
 const visitForm=document.createElement("section");
 visitForm.innerHTML='<h3>家訪／電訪｜隔離測試新增</h3><label for="visitDate">訪視日期</label><input type="date" id="visitDate"><label for="visitNote">虛構訪視內容</label><textarea id="visitNote" rows="3" maxlength="1000" style="box-sizing:border-box;width:100%;font-size:16px;padding:12px" placeholder="僅輸入虛構資料"></textarea><div class="grid"><button id="saveHome" type="button">儲存家訪</button><button id="savePhone" type="button">儲存電訪</button></div><output id="visitStatus" aria-live="polite"></output>';
 root.append(visitForm);
+visitForm.insertAdjacentHTML("beforeend",'<label for="visitRecord">既有訪視紀錄（同 UUID）</label><select id="visitRecord"><option value="">新增紀錄</option></select><button id="updateVisit" type="button">修改選取的訪視</button><output id="visitEditStatus" aria-live="polite"></output>');
+const planForm=document.createElement("section");
+planForm.innerHTML='<h3>照顧計畫｜隔離測試儲存</h3><label for="planText">計畫內容（僅虛構資料）</label><textarea id="planText" rows="4" style="width:100%;box-sizing:border-box;font-size:16px;padding:12px"></textarea><div class="grid"><button id="planLoad">讀取計畫</button><button id="planSave">新增／修改計畫</button></div><output id="planStatus" aria-live="polite"></output>';
+root.append(planForm);
 document.getElementById("visitDate").value=new Date().toLocaleDateString("en-CA");
 const $=id=>document.getElementById(id),client=YHNIsolatedV1.makeClient({baseUrl:"https://nddw2e.hatchable.site"});
 let remote=[],active=null,revision=null;
@@ -44,4 +48,51 @@ $("saveHome").onclick=()=>saveVisit("home");
 $("savePhone").onclick=()=>saveVisit("phone");
 $("apiHome").onclick=()=>run(()=>visits("home"));
 $("apiPhone").onclick=()=>run(()=>visits("phone"));
-$("apiPlan").onclick=()=>run(async()=>{if(!active)return status("尚未選取隔離個案");let r;try{r=await fetch("https://nddw2e.hatchable.site/api/v1/care-plans?case_id="+encodeURIComponent(active),{credentials:"include",headers:{Accept:"application/json"}})}catch{throw new YHNIsolatedV1.ApiError(0,"network_error")}let d={};try{d=await r.json()}catch{}if(!r.ok)throw new YHNIsolatedV1.ApiError(r.status,d.error);if(d.care_plan?.case_id!==active)throw new Error("照顧計畫 UUID 不一致");status("照顧計畫 UUID 一致："+active)});document.querySelector("#isolatedPanel h3").insertAdjacentHTML("afterend",'<button id="apiNew" type="button">產生全新虛構個案代碼</button>');$("apiNew").onclick=prepareNew;const saved=restoreSelection();if(saved)run(async()=>{const c=await client.get(saved);choose(c);status("重新整理後從隔離 API 讀取成功："+c.id)});else prepareNew();})();
+$("apiPlan").onclick=()=>run(async()=>{if(!active)return status("尚未選取隔離個案");let r;try{r=await fetch("https://nddw2e.hatchable.site/api/v1/care-plans?case_id="+encodeURIComponent(active),{credentials:"include",headers:{Accept:"application/json"}})}catch{throw new YHNIsolatedV1.ApiError(0,"network_error")}let d={};try{d=await r.json()}catch{}if(!r.ok)throw new YHNIsolatedV1.ApiError(r.status,d.error);if(d.care_plan?.case_id!==active)throw new Error("照顧計畫 UUID 不一致");status("照顧計畫 UUID 一致："+active)});document.querySelector("#isolatedPanel h3").insertAdjacentHTML("afterend",'<button id="apiNew" type="button">產生全新虛構個案代碼</button>');$("apiNew").onclick=prepareNew;const saved=restoreSelection();if(saved)run(async()=>{const c=await client.get(saved);choose(c);status("重新整理後從隔離 API 讀取成功："+c.id)});else prepareNew();
+let planRevision=null;
+async function requestIsolated(route,method,body,query){
+ const url="https://nddw2e.hatchable.site/api/v1/"+route+(query?"?case_id="+encodeURIComponent(query):"");
+ let r;try{r=await fetch(url,{method,credentials:"include",headers:{"Accept":"application/json",...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{})})}catch{throw new YHNIsolatedV1.ApiError(0,"network_error")}
+ const d=await r.json().catch(()=>({}));
+ if(!r.ok)throw new YHNIsolatedV1.ApiError(r.status,d.error);
+ return {status:r.status,data:d};
+}
+async function loadVisits(){
+ if(!active)throw new Error("請先選擇個案");
+ const {data}=await requestIsolated("visits","GET",null,active);
+ const select=$("visitRecord");select.replaceChildren(new Option("新增紀錄",""));
+ for(const v of data.visits||[])if(v.case_id===active)select.add(new Option((v.visit_type==="home"?"家訪":"電訪")+"｜"+v.visit_date+"｜"+v.id.slice(0,8),v.id));
+ return data.visits||[];
+}
+$("visitRecord").onchange=()=>run(async()=>{const chosen=$("visitRecord").value;const row=(await loadVisits()).find(v=>v.id===chosen);$("visitRecord").value=chosen;if(row){$("visitDate").value=String(row.visit_date).slice(0,10);$("visitNote").value=row.note}});
+$("updateVisit").onclick=()=>run(async()=>{
+ const visitId=$("visitRecord").value;if(!visitId)return $("visitEditStatus").textContent="請先選取既有訪視";
+ const rows=await loadVisits(),original=rows.find(v=>v.id===visitId);
+ if(!original)throw new Error("訪視不存在，請重新讀取");
+ const body={id:visitId,case_id:active,visit_type:original.visit_type,visit_date:$("visitDate").value,note:$("visitNote").value.trim()};
+ const saved=await requestIsolated("visits","PUT",body);
+ if(saved.status!==200||saved.data.visit?.case_id!==active)throw new Error("修改回傳 UUID 不符");
+ const check=(await loadVisits()).find(v=>v.id===visitId);
+ if(!check||check.note!==body.note)throw new Error("修改後 GET 未一致");
+ $("visitRecord").value=visitId;$("visitEditStatus").textContent="訪視修改200、重新GET200；UUID："+active;
+});
+$("planLoad").onclick=()=>run(async()=>{
+ if(!active)throw new Error("請先選擇個案");
+ const {data}=await requestIsolated("care-plans","GET",null,active);
+ const p=data.care_plan;if(p&&p.case_id!==active)throw new Error("計畫 UUID 不一致");
+ planRevision=p?.revision??null;$("planText").value=p?.content?.test_note??"";
+ $("planStatus").textContent=p?"計畫GET200｜revision "+planRevision:"計畫GET200｜尚未建立";
+});
+$("planSave").onclick=()=>run(async()=>{
+ if(!active)throw new Error("請先選擇個案");
+ const note=$("planText").value.trim();if(!note)throw new Error("請輸入虛構計畫內容");
+ const method=planRevision===null?"POST":"PUT";
+ const body={case_id:active,content:{test_note:note},...(method==="PUT"?{expected_revision:planRevision}:{})};
+ const result=await requestIsolated("care-plans",method,body);
+ if(result.data.saved!==true||result.data.care_plan?.case_id!==active)throw new Error("計畫儲存回傳 UUID 不符");
+ const verify=await requestIsolated("care-plans","GET",null,active);
+ if(verify.data.care_plan?.content?.test_note!==note)throw new Error("計畫儲存後 GET 未一致");
+ planRevision=verify.data.care_plan.revision;
+ $("planStatus").textContent="計畫"+method+" "+result.status+"、GET200｜UUID："+active+"｜revision "+planRevision;
+});
+})();
