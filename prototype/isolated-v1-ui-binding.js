@@ -21,7 +21,7 @@ function prepareNew(){active=null;revision=null;$("code").value=freshCode();$("n
 function restoreSelection(){try{return sessionStorage.getItem(ACTIVE_KEY)}catch{return null}}
 function rememberSelection(id){try{sessionStorage.setItem(ACTIVE_KEY,id)}catch{}}
 function status(t){$("apiStatus").textContent=t}
-function choose(c){active=c.id;revision=c.revision;planRevision=null;$("planText").value="";$("visitRecord").replaceChildren(new Option("請先讀取訪視紀錄",""));rememberSelection(c.id);$("code").value=c.case_code;$("name").value=c.display_name;status("隔離個案："+c.display_name+"｜UUID："+c.id+"｜revision："+revision)}
+function choose(c){active=c.id;revision=c.revision;planRevision=null;selectedVisitRevision=null;$("planText").value="";$("visitRecord").replaceChildren(new Option("請先讀取訪視紀錄",""));rememberSelection(c.id);$("code").value=c.case_code;$("name").value=c.display_name;status("隔離個案："+c.display_name+"｜UUID："+c.id+"｜revision："+revision)}
 async function run(fn){try{await fn()}catch(e){status(e.message+(e.code?"（"+e.code+"）":"")+"；請保留未儲存草稿")}}
 $("apiLoad").onclick=()=>run(async()=>{remote=await client.list();if(!remote.length)return prepareNew();choose(remote.find(c=>c.id===restoreSelection())||remote[0]);status("隔離 API 清單 "+remote.length+" 筆；"+remote[0].id)});
 $("apiCreate").onclick=()=>run(async()=>{if(!/^TEST-MOBILE-/.test($("code").value.trim()))return prepareNew();const c=await client.create({case_code:$("code").value.trim(),display_name:$("name").value.trim()});const verified=await client.get(c.id);choose(verified);status("隔離 API 新增並重新 GET 成功："+verified.id)});
@@ -49,7 +49,7 @@ $("savePhone").onclick=()=>saveVisit("phone");
 $("apiHome").onclick=()=>run(async()=>{await visits("home");await loadVisits()});
 $("apiPhone").onclick=()=>run(async()=>{await visits("phone");await loadVisits()});
 $("apiPlan").onclick=()=>run(async()=>{if(!active)return status("尚未選取隔離個案");let r;try{r=await fetch("https://nddw2e.hatchable.site/api/v1/care-plans?case_id="+encodeURIComponent(active),{credentials:"include",headers:{Accept:"application/json"}})}catch{throw new YHNIsolatedV1.ApiError(0,"network_error")}let d={};try{d=await r.json()}catch{}if(!r.ok)throw new YHNIsolatedV1.ApiError(r.status,d.error);if(d.care_plan?.case_id!==active)throw new Error("照顧計畫 UUID 不一致");status("照顧計畫 UUID 一致："+active)});document.querySelector("#isolatedPanel h3").insertAdjacentHTML("afterend",'<button id="apiNew" type="button">產生全新虛構個案代碼</button>');$("apiNew").onclick=prepareNew;const saved=restoreSelection();if(saved)run(async()=>{const c=await client.get(saved);choose(c);status("重新整理後從隔離 API 讀取成功："+c.id)});else prepareNew();
-let planRevision=null;
+let planRevision=null;let selectedVisitRevision=null;
 async function requestIsolated(route,method,body,query){
  const url="https://nddw2e.hatchable.site/api/v1/"+route+(query?"?case_id="+encodeURIComponent(query):"");
  let r;try{r=await fetch(url,{method,credentials:"include",headers:{"Accept":"application/json",...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{})})}catch{throw new YHNIsolatedV1.ApiError(0,"network_error")}
@@ -64,16 +64,16 @@ async function loadVisits(){
  for(const v of data.visits||[])if(v.case_id===active)select.add(new Option((v.visit_type==="home"?"家訪":"電訪")+"｜"+v.visit_date+"｜"+v.id.slice(0,8),v.id));
  return data.visits||[];
 }
-$("visitRecord").onchange=()=>run(async()=>{const chosen=$("visitRecord").value;const row=(await loadVisits()).find(v=>v.id===chosen);$("visitRecord").value=chosen;if(row){$("visitDate").value=String(row.visit_date).slice(0,10);$("visitNote").value=row.note}});
+$("visitRecord").onchange=()=>run(async()=>{const chosen=$("visitRecord").value;const row=(await loadVisits()).find(v=>v.id===chosen);$("visitRecord").value=chosen;if(row){selectedVisitRevision=row.revision;$("visitDate").value=String(row.visit_date).slice(0,10);$("visitNote").value=row.note}});
 $("updateVisit").onclick=()=>run(async()=>{
  const visitId=$("visitRecord").value;if(!visitId)return $("visitEditStatus").textContent="請先選取既有訪視";
  const rows=await loadVisits(),original=rows.find(v=>v.id===visitId);
  if(!original)throw new Error("訪視不存在，請重新讀取");
- const body={id:visitId,case_id:active,visit_type:original.visit_type,visit_date:$("visitDate").value,note:$("visitNote").value.trim()};
+ const body={id:visitId,case_id:active,visit_type:original.visit_type,visit_date:$("visitDate").value,note:$("visitNote").value.trim(),expected_revision:selectedVisitRevision};
  const saved=await requestIsolated("visits","PUT",body);
  if(saved.status!==200||saved.data.visit?.case_id!==active)throw new Error("修改回傳 UUID 不符");
  const check=(await loadVisits()).find(v=>v.id===visitId);
- if(!check||check.note!==body.note)throw new Error("修改後 GET 未一致");
+ if(!check||check.note!==body.note)throw new Error("修改後 GET 未一致");selectedVisitRevision=check.revision;
  $("visitRecord").value=visitId;$("visitEditStatus").textContent="訪視修改200、重新GET200；UUID："+active;
 });
 $("planLoad").onclick=()=>run(async()=>{
