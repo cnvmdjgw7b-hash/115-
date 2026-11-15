@@ -1,50 +1,193 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>永護寧｜家電訪生成器</title><link rel="stylesheet" href="/style.css"></head><body><header><div class="inner"><small>永護寧 HOME CARE｜家電訪 B 方案</small><h1>永護寧家電訪生成器</h1><p>選個案、紀錄、產出 Word，一頁完成</p><div class="notice">目前已提供個案建檔與家電訪紀錄儲存；未核對的個案先標示待核對。仍屬私人驗證環境，登入採 Hatchable member，尚未完成永護寧督導角色權限與正式文件驗收。</div></div></header><div class="flowline">選個案 → 填本次狀況 → AI 整理 → 下載家訪／電訪 Word</div><main>
-<section id="basic" class="page active"><article><h2>① 選擇個案（有資料就直接選）</h2><label>搜尋／選擇個案</label><input id="caseSearch" placeholder="搜尋案號或姓名"><select id="case"><option value="">讀取個案名冊中…</option></select><div class="hint" id="caseInfo">個案名冊依登入權限隔離。未確認正式來源前，新增資料標示「待核對」。</div><details><summary>＋ 新增個案</summary><label>個案案號（英數字）</label><input id="caseCode" maxlength="40" placeholder="例：115O04245"><label>個案姓名</label><input id="caseName" maxlength="80" placeholder="輸入個案姓名"><button class="primary" id="createCase">建立個案</button><div id="caseCreateStatus" aria-live="polite"></div></details>
-<details id="rosterImporter"><summary>📂 匯入／更新最新家電訪清冊（同一份個案名冊）</summary>
-<p class="hint">以「（玉）115 家電訪清冊最新一版(3).xlsm」為排程主檔，10月個案總表僅補充衛福案號。只讀取姓名、衛福案號、主責督導、服務狀態及1至10月家電訪；不匯入身分證、電話、病歷。</p>
-<label>① 最新家電訪清冊（.xlsm）</label><input id="rosterFile" type="file" accept=".xlsm,.xlsx">
-<label>② 10月個案總表（.xlsx）</label><input id="caseBaseFile" type="file" accept=".xlsx">
-<button class="secondary" id="checkImport">核對兩份檔案</button>
-<button class="primary" id="submitImport" disabled>確認後寫入個案資料庫</button>
-<div id="importSummary" class="hint" aria-live="polite">只接受最新家電訪清冊 XLSM 與 10 月總表 XLSX；V2 備份 JSON 是另一種資料結構，不能直接當家電訪主檔匯入。先核對，再寫入，不刪歷史紀錄。</div>
-</details></article><article><h2>② 本次訪視</h2><label>訪視方式</label><div class="row"><button class="type chosen" data-type="家訪">家訪</button><button class="type" data-type="電訪">電訪</button></div><label>訪視日期</label><input type="date" id="date"><label>受訪對象</label><select id="who"><option>案主</option><option>案女</option><option>案子</option><option>配偶</option><option>主要照顧者</option><option>其他家屬</option></select><label>資訊來源</label><input id="source" placeholder="例：案女電話轉述／居督現場觀察"><button class="primary" data-next="facts">下一步：本次訪視</button></article></section>
-<section id="facts" class="page"><article><h2>前次待追蹤</h2><div id="track" class="hint"></div></article><article><h2>③ 勾選本次狀況</h2><p class="hint">只勾選本次確實確認的事實；不勾選不補寫。</p><input id="filter" placeholder="搜尋情境，如：行走、洗澡、備餐、代班"><div id="categories" class="chips"></div><div id="options"></div><div id="picked" class="hint"></div><label>本次補充事實（僅填已確認事項）</label><textarea rows="5" id="extra" placeholder="例：右膝術後仍有疼痛，無法久站；案女說平日有工作，希望協助備餐。"></textarea><label>已完成處置／預計安排／待確認事項</label><textarea rows="4" id="actions" placeholder="例：已向案家說明服務內容；後續依核定項目安排。不可將未完成事項寫成已完成。"></textarea><button class="primary" data-next="draft">下一步：AI 紀錄</button></article></section>
-<section id="draft" class="page"><article><h2>④ AI 整理與修正</h2><p class="hint">依本次事實產生四段式紀錄。生成前先確認資訊來源；生成後可直接修改。AI 無法使用時不會假裝產生成功。</p><button id="generate" class="primary">✨ AI 產生居督紀錄</button><div id="status" aria-live="polite"></div><div id="warnings"></div><div id="fields"></div><div class="row"><button id="save" class="secondary">儲存草稿（測試資料庫）</button><button id="export" class="secondary">匯出文字</button></div></article></section>
-<section id="history" class="page"><article><h2>📚 個案訪視歷史</h2><p class="hint">去識別化草稿依登入協作者隔離儲存於測試資料庫；不是永護寧正式主檔。</p><div id="historyList"></div></article></section>
-<section id="form" class="page">
-<article><h2>⑤ 下載家訪 Word</h2>
-<div class="notice">測試功能：使用瀏覽器本機選取 Word .docx 範本，資料不會上傳到伺服器。請先使用去識別化或空白範本，正式資料不得在此測試。</div>
-<label>家訪 Word 空白範本（首次需選擇 .docx）</label><input type="file" id="templateFile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><p class="hint" id="templateStatus">請選擇永護寧「居服字002(3)-112.06」空白 Word 範本（不得使用已填個案紀錄）。系統保留原 Word 排版。</p>
-<div class="row"><div><label>案號</label><input id="fCaseId" placeholder="從個案名冊帶入"></div><div><label>個案姓名</label><input id="fName" placeholder="從個案名冊帶入"></div></div>
-<div class="row"><div><label>出生日期（民國）</label><input id="fDob" placeholder="例：40年01月01日"></div><div><label>訪視日期</label><input type="date" id="fDate"></div></div>
-<label>受訪身分</label><input id="fWho" placeholder="例：案主、案女"><label>服務需求符合性</label>
-<select id="fServiceFit"><option value="維持服務">維持服務</option><option value="調整服務">調整服務</option><option value="新案">新案</option></select>
-<label>本次服務項目（依核定資料確認，不自動推定）</label>
-<div id="baOptions" class="chips"></div>
-<div class="row"><div><label>居家環境衛生</label><select id="fHygiene"><option value="">未評估</option><option>環境整潔乾淨</option><option>空氣流通</option><option>孳生蚊蠅</option><option>雜亂骯髒昏暗</option><option>潮濕有異味</option></select></div>
-<div><label>居家環境安全</label><select id="fSafety"><option value="">未評估</option><option>行走動線通暢明亮</option><option>通道狹窄或有阻礙</option><option>光源不足</option><option>雜物多且亂</option><option>地面不平</option><option>有跌倒風險</option></select></div></div>
-<label>社會資源／補助（有確認才填）</label><input id="fSupport" placeholder="例：中低收入老人生活津貼"><label>身心狀況評估</label><input id="fPsych" placeholder="評估量表應依原始表單實際填答；此處不得臆測分數">
-<label>督導（測試代稱）</label><input id="fSupervisor" placeholder="督導甲">
-</article><article><h2>② 家訪四段紀錄帶入（電訪需使用獨立表單）</h2><p class="hint">使用「③ 紀錄」頁已產生或人工確認的四段文字，這裡可再逐段修改。下載 Word 時將套入原始 Word 表單的處遇計畫欄位。</p><div id="formNarratives"></div>
-<div class="row"><button class="secondary" id="copyNarratives">從 AI 紀錄帶入</button><button class="secondary" id="previewForm">核對家訪欄位</button></div>
-<button class="primary" id="downloadWord">⬇ 產出家訪 Word</button>
-<div id="wordStatus" aria-live="polite"></div><div id="formPrint" class="printarea" hidden></div>
-</article></section>
-<section id="phone" class="page">
-<article><h2>⑤ 下載電訪 Word</h2><p class="hint">依「居服字001(3)-112.06」電訪表單獨立設計；不使用家訪四段式。僅使用模擬或去識別化資料。</p>
-<label>① 上傳核對後的空白電訪 Word 範本（.docx）</label><input type="file" id="phoneTemplate" accept=".docx"><div id="phoneTemplateState" class="hint">本機處理，不傳送 Word 到網站伺服器。</div>
-<div class="row"><div><label>案號</label><input id="pCaseId" placeholder="從個案名冊帶入"></div><div><label>電訪日期</label><input id="pDate" type="date"></div></div>
-<label>電訪對象</label><select id="pInterviewee"><option>案主</option><option>案女</option><option>案子</option><option>配偶</option><option>其他家屬</option></select>
-<label>聯繫方式（不輸入真實電話）</label><select id="pChannel"><option>電話</option><option>LINE APP</option><option>其他</option></select>
-<label>服務項目</label><div class="chips" id="pServices"></div>
-<label>常用語言</label><select id="pLanguage"><option>國語</option><option>台語</option><option>客語</option><option>其他</option><option>未確認</option></select>
-<h3>② 服務調查狀況</h3><label>聯繫情形（可複選）</label><div id="pContact" class="chips"></div>
-<label>意識表達</label><select id="pAwareness"><option value="">未評估</option><option>清楚</option><option>尚可</option><option>模糊或無法表達</option></select>
-<label>健康情形</label><select id="pHealth"><option value="">未評估</option><option>良好</option><option>尚可</option><option>虛弱</option><option>病痛</option></select>
-<label>到班時間</label><select id="pArrival"><option value="">未確認</option><option>準時</option><option>遲到</option><option>早退</option></select>
-<label>服務項目執行情形</label><select id="pExecution"><option value="">未確認</option><option>確實執行</option><option>敷衍</option><option>隨意變更</option></select>
-<label>服務態度</label><select id="pAttitude"><option value="">未確認</option><option>非常好</option><option>很好</option><option>普通</option><option>不佳</option><option>極差</option></select>
-<label>服務行為（可複選）</label><div id="pBehavior" class="chips"></div>
-<h3>③ 特殊紀錄或建議說明</h3><textarea id="pNotes" rows="7" placeholder="例：案子透過 LINE 表示有陪同就醫需求；已完成或待安排事項請分別敘明。"></textarea>
-<div class="row"><div><label>電訪人（測試代稱）</label><input id="pVisitor" placeholder="督導甲"></div><div><label>督導（測試代稱）</label><input id="pSupervisor" placeholder="督導甲"></div></div><div class="row"><button class="secondary" id="pImportAI">從本次訪視紀錄帶入供修改</button><button class="secondary" id="pPreview">核對電訪欄位</button></div><button class="primary" id="pExport">⬇ 產出電訪 Word</button><div id="pStatus" aria-live="polite"></div>
-</article></section></main><script src="/vendor/jszip.min.js"></script><script src="/app.js"></script><script src="/form.js"></script><script src="/phone.js"></script><script src="/import.js"></script><script src="/onepage.js"></script></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#21654e">
+  <title>永護寧｜家電訪智慧紀錄模組</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="inner">
+    <small>永護寧 HOME CARE｜家電訪 B 方案</small>
+    <h1>家電訪智慧紀錄模組</h1>
+    <p>選個案 → 記錄本次事實 → 整理紀錄 → 輸出家訪／電訪 Word</p>
+    <div class="notice">功能測試版｜17 類情境勾選、三版四欄紀錄、情境判斷與真實性檢核。登入採 Hatchable member；個案與訪視資料依登入協作者隔離。尚未完成督導角色權限及正式文件驗收，請勿輸入正式個案資料。</div>
+  </div>
+</header>
+<div class="flowline">⓪ 個案建檔　→　① 基本資料　→　② 本次訪視　→　③ 紀錄與修正　→　④ Word 輸出</div>
+<nav aria-label="主要功能">
+  <button data-page="basic" class="active">① 個案</button>
+  <button data-page="facts">② 訪視</button>
+  <button data-page="draft">③ 紀錄</button>
+  <button data-page="history">④ 歷史</button>
+</nav>
+<main>
+  <section id="basic" class="page active">
+    <article>
+      <h2>⓪ 個案名冊與匯入</h2>
+      <p class="hint">名冊依登入權限隔離。未核對正式來源的個案應標示待核對；本測試版僅使用模擬或去識別化資料。</p>
+      <label for="caseSearch">搜尋個案（姓名／案號）</label>
+      <input id="caseSearch" type="search" placeholder="輸入姓名或案號搜尋">
+      <label for="case">選擇個案</label>
+      <select id="case"><option value="">讀取個案名冊中…</option></select>
+      <div id="caseInfo" class="hint" aria-live="polite">名冊尚在載入。</div>
+      <details>
+        <summary>＋ 新增個案（測試資料）</summary>
+        <label for="caseCode">個案案號（英數字）</label>
+        <input id="caseCode" maxlength="40" placeholder="例：TEST-001">
+        <label for="caseName">個案姓名／測試代稱</label>
+        <input id="caseName" maxlength="80" placeholder="例：測試個案 A">
+        <button class="secondary" id="createCase" type="button">建立個案</button>
+        <div id="caseCreateStatus" class="hint" aria-live="polite"></div>
+      </details>
+      <details id="rosterImporter">
+        <summary>📂 匯入／更新家電訪清冊</summary>
+        <p class="hint">在瀏覽器中核對清冊及個案總表，確認後才送至目前登入帳號的測試資料庫。不匯入身分證、電話或病歷；匯入前請勿使用真實個案資料。</p>
+        <label for="rosterFile">① 最新家電訪清冊（.xlsm）</label>
+        <input id="rosterFile" type="file" accept=".xlsm,.xlsx">
+        <label for="caseBaseFile">② 個案總表（.xlsx）</label>
+        <input id="caseBaseFile" type="file" accept=".xlsx">
+        <div class="row">
+          <button class="secondary" id="checkImport" type="button">核對兩份檔案</button>
+          <button class="primary" id="submitImport" type="button" disabled>確認後寫入測試資料庫</button>
+        </div>
+        <div id="importSummary" class="hint" aria-live="polite">先選擇指定檔案並核對；核對失敗時不會寫入名冊。</div>
+      </details>
+      <div class="notice">⚠️ 瀏覽器清除網站資料、私人瀏覽或換裝置可能遺失本機草稿。正式使用需完成登入權限、加密、備份、稽核與個資安全驗收。</div>
+    </article>
+    <article>
+      <h2>① 基本資料</h2>
+      <p class="hint">先選訪視方式與日期，再記錄本次確認的情況。個案姓名及督導資訊依名冊顯示，不要在補充欄填入身分證或電話。</p>
+      <label>訪視方式</label>
+      <div class="row">
+        <button class="type chosen" type="button" data-type="家訪">家訪</button>
+        <button class="type" type="button" data-type="電訪">電訪</button>
+      </div>
+      <label for="date">訪視日期</label>
+      <input type="date" id="date">
+      <label for="who">受訪對象</label>
+      <select id="who">
+        <option>案主</option><option>案女</option><option>案子</option><option>配偶</option>
+        <option>主要照顧者</option><option>其他家屬</option>
+      </select>
+      <label for="source">資訊來源／訪談情形</label>
+      <input id="source" placeholder="例：案女電話轉述／居督現場觀察">
+      <button class="primary" type="button" data-next="facts">下一步：本次訪視</button>
+    </article>
+  </section>
+
+  <section id="facts" class="page">
+    <article>
+      <h2>📌 前次待追蹤</h2>
+      <div id="track" class="hint" aria-live="polite">載入該個案已儲存的待追蹤事項。</div>
+    </article>
+    <article>
+      <h2>② 勾選本次狀況</h2>
+      <p class="hint">17 類情境。只勾選本次確實確認的事實；不勾選不補寫。</p>
+      <label for="filter">搜尋情境</label>
+      <input id="filter" type="search" placeholder="例如：行走、洗澡、備餐、代班">
+      <div id="categories" class="chips" aria-label="情境分類"></div>
+      <div id="options"></div>
+      <div id="picked" class="hint" aria-live="polite">尚未選取情境。</div>
+      <label for="extra">本次訪視補充／個案或家屬說法</label>
+      <textarea rows="5" id="extra" placeholder="記錄來源、實際情形及生活影響；只寫已確認事實。請勿輸入姓名、身分證、電話或其他可識別個資。"></textarea>
+      <label for="actions">已完成處置／預計安排／待確認事項</label>
+      <textarea rows="4" id="actions" placeholder="明確區分已完成、預計安排與待確認；未執行事項不可寫成已完成。"></textarea>
+      <button class="primary" type="button" data-next="draft">下一步：紀錄整理</button>
+    </article>
+  </section>
+
+  <section id="draft" class="page">
+    <article>
+      <h2>③ 紀錄產生與修正</h2>
+      <p class="hint">依本次提供的事實產生四段紀錄；AI 無法使用時會明確提示，不會假裝成功。生成內容須由督導核實，並可人工修改。</p>
+      <div class="row">
+        <button id="generate" class="primary" type="button">✨ 產生居督紀錄</button>
+        <button id="validate" class="secondary" type="button">檢查資料</button>
+      </div>
+      <div id="status" aria-live="polite"></div>
+      <div id="warnings"></div>
+      <div id="fields"></div>
+      <div class="row">
+        <button id="save" class="secondary" type="button">儲存草稿（測試資料庫）</button>
+        <button id="export" class="secondary" type="button">匯出文字</button>
+      </div>
+      <p class="hint">存檔須由伺服器確認成功才會顯示完成；測試資料庫不是正式主檔。</p>
+    </article>
+    <section id="form" class="page">
+      <article>
+        <h2>⑤ 下載家訪 Word</h2>
+        <div class="notice">僅供測試。請使用空白、去識別化的「居服字002(3)-112.06」範本；範本只在瀏覽器處理，不會上傳。</div>
+        <label for="templateFile">家訪 Word 空白範本（.docx）</label>
+        <input type="file" id="templateFile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+        <p id="templateStatus" class="hint">首次使用需選擇經核對的空白範本；不可使用含有已填個案資料的文件。</p>
+        <div class="row">
+          <div><label for="fCaseId">案號（已核對才填）</label><input id="fCaseId" placeholder="從名冊帶入"></div>
+          <div><label for="fName">個案姓名／代稱</label><input id="fName" placeholder="從名冊帶入"></div>
+        </div>
+        <div class="row">
+          <div><label for="fDob">出生日期（民國）</label><input id="fDob" placeholder="例：40年01月01日"></div>
+          <div><label for="fDate">訪視日期</label><input type="date" id="fDate"></div>
+        </div>
+        <label for="fWho">受訪身分</label><input id="fWho" placeholder="例：案主、案女">
+        <label for="fServiceFit">服務需求符合性</label>
+        <select id="fServiceFit"><option value="維持服務">維持服務</option><option value="調整服務">調整服務</option><option value="新案">新案</option></select>
+        <label>本次服務項目（依核定資料確認，不自動推定）</label><div id="baOptions" class="chips"></div>
+        <div class="row">
+          <div><label for="fHygiene">居家環境衛生</label><select id="fHygiene"><option value="">未評估</option><option>環境整潔乾淨</option><option>空氣流通</option><option>孳生蚊蠅</option><option>雜亂骯髒昏暗</option><option>潮濕有異味</option></select></div>
+          <div><label for="fSafety">居家環境安全</label><select id="fSafety"><option value="">未評估</option><option>行走動線通暢明亮</option><option>通道狹窄或有阻礙</option><option>光源不足</option><option>雜物多且亂</option><option>地面不平</option><option>有跌倒風險</option></select></div>
+        </div>
+        <label for="fSupport">社會資源／補助（確認後填寫）</label><input id="fSupport" placeholder="有確認才填">
+        <label for="fPsych">身心狀況評估</label><input id="fPsych" placeholder="量表依原始表單實際評估，不得臆測分數">
+        <label for="fSupervisor">督導（測試代稱）</label><input id="fSupervisor" placeholder="督導甲">
+        <h3>家訪四段紀錄</h3><div id="formNarratives"></div>
+        <div class="row"><button class="secondary" id="copyNarratives" type="button">從本次紀錄帶入</button><button class="secondary" id="previewForm" type="button">核對家訪欄位</button></div>
+        <button class="primary" id="downloadWord" type="button">⬇ 產出家訪 Word</button>
+        <div id="wordStatus" aria-live="polite"></div><div id="formPrint" class="printarea" hidden></div>
+      </article>
+    </section>
+    <section id="phone" class="page">
+      <article>
+        <h2>⑤ 下載電訪 Word</h2>
+        <p class="hint">依「居服字001(3)-112.06」電訪表單獨立套印，不使用家訪四段式。範本只在瀏覽器處理，請使用空白及去識別化文件。</p>
+        <label for="phoneTemplate">電訪 Word 空白範本（.docx）</label><input type="file" id="phoneTemplate" accept=".docx">
+        <div id="phoneTemplateState" class="hint">本機處理，不傳送 Word 到網站伺服器。</div>
+        <div class="row"><div><label for="pCaseId">案號（已核對才填）</label><input id="pCaseId" placeholder="從名冊帶入"></div><div><label for="pDate">電訪日期</label><input id="pDate" type="date"></div></div>
+        <label for="pInterviewee">電訪對象</label><select id="pInterviewee"><option>案主</option><option>案女</option><option>案子</option><option>配偶</option><option>其他家屬</option></select>
+        <label for="pChannel">聯繫方式（不輸入電話）</label><select id="pChannel"><option>電話</option><option>LINE APP</option><option>其他</option></select>
+        <label>服務項目</label><div class="chips" id="pServices"></div>
+        <label for="pLanguage">常用語言</label><select id="pLanguage"><option>國語</option><option>台語</option><option>客語</option><option>其他</option><option>未確認</option></select>
+        <h3>服務調查狀況</h3>
+        <label>聯繫情形（可複選）</label><div id="pContact" class="chips"></div>
+        <label for="pAwareness">意識表達</label><select id="pAwareness"><option value="">未評估</option><option>清楚</option><option>尚可</option><option>模糊或無法表達</option></select>
+        <label for="pHealth">健康情形</label><select id="pHealth"><option value="">未評估</option><option>良好</option><option>尚可</option><option>虛弱</option><option>病痛</option></select>
+        <label for="pArrival">到班時間</label><select id="pArrival"><option value="">未確認</option><option>準時</option><option>遲到</option><option>早退</option></select>
+        <label for="pExecution">服務項目執行情形</label><select id="pExecution"><option value="">未確認</option><option>確實執行</option><option>敷衍</option><option>隨意變更</option></select>
+        <label for="pAttitude">服務態度</label><select id="pAttitude"><option value="">未確認</option><option>非常好</option><option>很好</option><option>普通</option><option>不佳</option><option>極差</option></select>
+        <label>服務行為（可複選）</label><div id="pBehavior" class="chips"></div>
+        <label for="pNotes">特殊紀錄或建議說明</label><textarea id="pNotes" rows="6" placeholder="記錄本次確認事項，並區分已完成與待辦安排。"></textarea>
+        <div class="row"><div><label for="pVisitor">電訪人（測試代稱）</label><input id="pVisitor" placeholder="督導甲"></div><div><label for="pSupervisor">督導（測試代稱）</label><input id="pSupervisor" placeholder="督導甲"></div></div>
+        <div class="row"><button class="secondary" id="pImportAI" type="button">帶入本次紀錄供修改</button><button class="secondary" id="pPreview" type="button">核對電訪欄位</button></div>
+        <button class="primary" id="pExport" type="button">⬇ 產出電訪 Word</button><div id="pStatus" aria-live="polite"></div>
+      </article>
+    </section>
+  </section>
+
+  <section id="history" class="page">
+    <article>
+      <h2>④ 個案訪視歷史</h2>
+      <p class="hint">訪視草稿儲存在登入協作者隔離的測試資料庫。這不是正式主檔；需確認存檔狀態後再離開頁面。</p>
+      <div id="historyList" aria-live="polite"></div>
+    </article>
+  </section>
+</main>
+<script src="/vendor/jszip.min.js"></script>
+<script src="/app.js"></script>
+<script src="/form.js"></script>
+<script src="/phone.js"></script>
+<script src="/import.js"></script>
+<script src="/onepage.js"></script>
+</body>
+</html>
