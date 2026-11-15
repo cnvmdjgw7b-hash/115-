@@ -38,3 +38,18 @@
 - **新增風險：** 照顧計畫 `GET /api/cases` 以 member 身分開放，但 SQL 未以 actor 限制資料列；不同 collaborator 可能讀到全部草稿。正式資料接入前必須修復權限隔離。家電訪 `member_id` 只有一種值不代表跨裝置或不同帳號能共用。
 - **設計差異待決：** 前端草案採 `/api/v1/cases/{id}` + `legacy_case_map`，後端原草案採 `/api/cases/:id`；建議統一以版本化 `/api/v1` 作新契約，保留舊 API 相容；不得在未實作前讓前端接線。
 - **驗收阻擋：** 尚無兩庫可驗證的受控備份及還原測試；未建立隔離測試 DB。依不得修改正式資料規定，未對現有專案執行 INSERT/UPDATE/DELETE，也未部署。新增／修改／重新讀取／跨裝置及跨模組寫入測試皆未通過，不能標示完成。
+
+## 第三階段契約對照表（核對提交 5a5fc4b 與 8897d74）
+| 面向 | 前端 5a5fc4b | 後端 8897d74 | 結論 |
+|---|---|---|---|
+| 個案主鍵 | 不可變伺服器 UUID `case_id` | 不可變 UUID `case_id` | 原則一致；現存家電訪 `id` 可作候選，但未核准權威主鍵 |
+| 舊 ID | `legacy_case_map` | 禁止用姓名或不同庫 ID 直接推斷 | 需補充 mapping 驗證與審核，不可自動建立 |
+| 欄位 | 含 supervisor_id、approved_services、verification_status、revision | 現有 supervisor、monthly_plan、status 等 | **未一致**；需定義欄位映射、缺欄位 migration、來源優先序 |
+| API 路徑 | `/api/v1/cases/{id}` | `/api/cases/:id` | **未一致**；以新 `/api/v1` 為提案，舊路徑保留，不得宣稱已實作 |
+| 回傳 | 未明訂完整 response envelope | `{saved,case:{id,case_code,display_name,revision,updated_at}}` | **未一致**；建議列表 `{cases:[...]}`、單筆 `{case:{...}}`、寫入 `{saved:true,case:{...}}`、錯誤 `{error,details?}` |
+| 權限 | 主管全案、督導授權個案 | 目前 Hatchable member 隔離 | **未一致**；member 是 collaborator 而非機構督導，必須建立實際終端使用者身分與角色 |
+| 版本衝突 | `expected_revision`、409 | `revision/If-Match`、409 | 原則一致；建議 JSON `expected_revision` 作必填，先完成後端原子條件更新 |
+
+**暫定前端不得接線的新 API 合約（待雙方核准及實作）**：`GET /api/v1/cases`→`{cases:[{id,case_code,display_name,revision,updated_at}]}`；`POST /api/v1/cases` body `{case_code,display_name}`→201 `{saved:true,case:{...}}`；`GET /api/v1/cases/{uuid}`→200 `{case:{...}}`；`PATCH /api/v1/cases/{uuid}` body `{display_name,expected_revision}`→200 `{saved:true,case:{...}}`。HTTP 400/401/403/404/409/500 必須以實測確認。所有端點須同源、使用者身分授權及服務端行級授權。
+
+**備份現況**：未取得可驗證之兩套 PostgreSQL 完整匯出、還原權限或還原演練證據；唯讀 SQL 統計不是備份。依主管「先備份、不得修改正式資料」限制，阻擋對現有兩庫做任何測試寫入。隔離測試環境也尚未建立；不得把草案當已通過測試。
