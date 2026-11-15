@@ -29,3 +29,12 @@
 2. 核對140筆資料的來源、member_id 分布、是否正式清冊及個案編碼映射；敏感個資不得進公開 GitHub。
 3. 在隔離測試環境完成新增→GET→修改→GET→重新登入→跨授權帳號／裝置；同時測未授權401及衝突409。
 4. 第一位 AI 僅在契約核准且 API 測試通過後接線；不合併四份 HTML，不動正式部署。
+
+## 2026-11-15 雙 AI 核對結果（對照前端提交 5a5fc4b）
+- 一致：家電訪140個案／7訪視；照顧計畫三表均0；家電訪現行 API 僅 GET/POST；正式主庫資格未核准。
+- 家電訪140個案：`id`、`case_code`、`display_name` 各140個不同值，`member_id` 一種；117筆 `verified/official_code_matched=true`，23筆 `pending_verification/false`；全數 `source_version` 為「（玉）115 家電訪清冊最新一版(3).xlsm」。這是來源欄位宣稱，尚未與原始檔核對真實性、截止日及正式核准。
+- 7訪視中5筆能以 `case_key + member_id` 對上個案；2筆無法關聯的 `case_key` 為字面值 `A`、`B`，均屬 `preview:member`，皆非 UUID；原因是測試／預覽格式鍵值不符，**不能推斷原始個案已刪除**。原資料保留，暫不建立映射。
+- 照顧計畫三表0筆；已部署 `/api/cases`，支援 GET/POST 及 `case_key` upsert + expected_revision、版本與稽核。無法由現有筆數判斷過往是否曾寫入、寫到其他環境或被清空；須查部署紀錄／原始備份／匯入路徑，不能宣稱資料遺失或無資料遺失。
+- **新增風險：** 照顧計畫 `GET /api/cases` 以 member 身分開放，但 SQL 未以 actor 限制資料列；不同 collaborator 可能讀到全部草稿。正式資料接入前必須修復權限隔離。家電訪 `member_id` 只有一種值不代表跨裝置或不同帳號能共用。
+- **設計差異待決：** 前端草案採 `/api/v1/cases/{id}` + `legacy_case_map`，後端原草案採 `/api/cases/:id`；建議統一以版本化 `/api/v1` 作新契約，保留舊 API 相容；不得在未實作前讓前端接線。
+- **驗收阻擋：** 尚無兩庫可驗證的受控備份及還原測試；未建立隔離測試 DB。依不得修改正式資料規定，未對現有專案執行 INSERT/UPDATE/DELETE，也未部署。新增／修改／重新讀取／跨裝置及跨模組寫入測試皆未通過，不能標示完成。
