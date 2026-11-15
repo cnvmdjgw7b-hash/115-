@@ -1,0 +1,3 @@
+[ai]
+required = true
+description = "將去識別化家電訪事實整理為台灣居督紀錄，需設定 AI 供應商金鑰。"
