@@ -21,7 +21,7 @@ function prepareNew(){active=null;revision=null;$("code").value=freshCode();$("n
 function restoreSelection(){try{return sessionStorage.getItem(ACTIVE_KEY)}catch{return null}}
 function rememberSelection(id){try{sessionStorage.setItem(ACTIVE_KEY,id)}catch{}}
 function status(t){$("apiStatus").textContent=t}
-function choose(c){active=c.id;revision=c.revision;rememberSelection(c.id);$("code").value=c.case_code;$("name").value=c.display_name;status("隔離個案："+c.display_name+"｜UUID："+c.id+"｜revision："+revision)}
+function choose(c){active=c.id;revision=c.revision;planRevision=null;$("planText").value="";$("visitRecord").replaceChildren(new Option("請先讀取訪視紀錄",""));rememberSelection(c.id);$("code").value=c.case_code;$("name").value=c.display_name;status("隔離個案："+c.display_name+"｜UUID："+c.id+"｜revision："+revision)}
 async function run(fn){try{await fn()}catch(e){status(e.message+(e.code?"（"+e.code+"）":"")+"；請保留未儲存草稿")}}
 $("apiLoad").onclick=()=>run(async()=>{remote=await client.list();if(!remote.length)return prepareNew();choose(remote.find(c=>c.id===restoreSelection())||remote[0]);status("隔離 API 清單 "+remote.length+" 筆；"+remote[0].id)});
 $("apiCreate").onclick=()=>run(async()=>{if(!/^TEST-MOBILE-/.test($("code").value.trim()))return prepareNew();const c=await client.create({case_code:$("code").value.trim(),display_name:$("name").value.trim()});const verified=await client.get(c.id);choose(verified);status("隔離 API 新增並重新 GET 成功："+verified.id)});
@@ -31,7 +31,7 @@ async function visits(type){if(!active)return status("尚未選取隔離個案")
 async function saveVisit(type){
  const out=$("visitStatus");const note=$("visitNote").value.trim(),visit_date=$("visitDate").value;
  if(!active)return out.textContent="請先選擇隔離個案";
- if(!note||!/^\\d{4}-\\d{2}-\\d{2}$/.test(visit_date))return out.textContent="請輸入虛構訪視日期與內容";
+ if(!note||!/^\d{4}-\d{2}-\d{2}$/.test(visit_date))return out.textContent="請輸入虛構訪視日期與內容";
  out.textContent="儲存中…";
  try{
   const response=await fetch("https://nddw2e.hatchable.site/api/v1/visits",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({case_id:active,visit_type:type,visit_date,note})});
@@ -46,8 +46,8 @@ async function saveVisit(type){
 }
 $("saveHome").onclick=()=>saveVisit("home");
 $("savePhone").onclick=()=>saveVisit("phone");
-$("apiHome").onclick=()=>run(()=>visits("home"));
-$("apiPhone").onclick=()=>run(()=>visits("phone"));
+$("apiHome").onclick=()=>run(async()=>{await visits("home");await loadVisits()});
+$("apiPhone").onclick=()=>run(async()=>{await visits("phone");await loadVisits()});
 $("apiPlan").onclick=()=>run(async()=>{if(!active)return status("尚未選取隔離個案");let r;try{r=await fetch("https://nddw2e.hatchable.site/api/v1/care-plans?case_id="+encodeURIComponent(active),{credentials:"include",headers:{Accept:"application/json"}})}catch{throw new YHNIsolatedV1.ApiError(0,"network_error")}let d={};try{d=await r.json()}catch{}if(!r.ok)throw new YHNIsolatedV1.ApiError(r.status,d.error);if(d.care_plan?.case_id!==active)throw new Error("照顧計畫 UUID 不一致");status("照顧計畫 UUID 一致："+active)});document.querySelector("#isolatedPanel h3").insertAdjacentHTML("afterend",'<button id="apiNew" type="button">產生全新虛構個案代碼</button>');$("apiNew").onclick=prepareNew;const saved=restoreSelection();if(saved)run(async()=>{const c=await client.get(saved);choose(c);status("重新整理後從隔離 API 讀取成功："+c.id)});else prepareNew();
 let planRevision=null;
 async function requestIsolated(route,method,body,query){
