@@ -1,19 +1,20 @@
 import { db } from "hatchable";
+import {roleOf} from "lib/yhn-access.js";
 export const access = "member";
 export const methods = ["GET", "POST"];
 const send = (res, status, body) => { res.setHeader("Cache-Control","no-store, max-age=0"); return res.status(status).json(body); };
 const uuid = v => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export default async function(req,res){
   const actor = String(req.member?.id || "");
-  if (!actor) return send(res,403,{error:"identity_unavailable"});
+  if (!actor || !await roleOf(actor)) return send(res,403,{error:"identity_unavailable"});
   if (req.method === "GET") {
     const id = req.query?.id;
     if (id) {
       if (!uuid(id)) return send(res,400,{error:"invalid_case_id"});
-      const one = await db.query("SELECT id, case_key, patient_name, source_name, source_date, effective_date, content, status, updated_at, revision FROM care_cases WHERE id=$1 AND updated_by=$2 LIMIT 1",[id,actor]);
+      const one = await db.query("SELECT id, case_key, patient_name, source_name, source_date, effective_date, content, status, updated_at, revision FROM care_cases WHERE id=$1 AND (EXISTS(SELECT 1 FROM yhn_member_roles r WHERE r.actor_id=$2 AND r.enabled=true AND r.role='機構主管') OR EXISTS(SELECT 1 FROM yhn_isolated_access_grants g WHERE g.actor_id=$2 AND g.case_id=care_cases.id AND g.role='居督' AND g.permission='read' AND g.revoked_at IS NULL AND g.effective_at<=now() AND (g.expires_at IS NULL OR g.expires_at>now()))) LIMIT 1",[id,actor]);
       return one.rows.length ? send(res,200,{case:one.rows[0]}) : send(res,404,{error:"draft_not_found"});
     }
-    const result = await db.query("SELECT id,case_key,patient_name,source_name,source_date,effective_date,status,updated_at,revision FROM care_cases WHERE updated_by=$1 ORDER BY updated_at DESC LIMIT 100",[actor]);
+    const result = await db.query("SELECT id,case_key,patient_name,source_name,source_date,effective_date,status,updated_at,revision FROM care_cases WHERE (EXISTS(SELECT 1 FROM yhn_member_roles r WHERE r.actor_id=$1 AND r.enabled=true AND r.role='機構主管') OR EXISTS(SELECT 1 FROM yhn_isolated_access_grants g WHERE g.actor_id=$1 AND g.case_id=care_cases.id AND g.role='居督' AND g.permission='read' AND g.revoked_at IS NULL AND g.effective_at<=now() AND (g.expires_at IS NULL OR g.expires_at>now()))) ORDER BY updated_at DESC LIMIT 100",[actor]);
     return send(res,200,{cases:result.rows});
   }
   const b=req.body||{}, {case_key,patient_name,source_name,source_date,effective_date,content}=b;
@@ -35,7 +36,7 @@ export default async function(req,res){
       " ON CONFLICT(case_key) DO UPDATE SET patient_name=EXCLUDED.patient_name,source_name=EXCLUDED.source_name,"+
       " source_date=EXCLUDED.source_date,effective_date=EXCLUDED.effective_date,content=EXCLUDED.content,status='草稿',"+
       " updated_by=EXCLUDED.updated_by,updated_at=now(),revision=care_cases.revision+1"+
-      " WHERE care_cases.revision=$8 AND care_cases.updated_by=$7"+
+      " WHERE care_cases.revision=$8 AND (EXISTS(SELECT 1 FROM yhn_member_roles r WHERE r.actor_id=$7 AND r.enabled=true AND r.role='機構主管') OR EXISTS(SELECT 1 FROM yhn_isolated_access_grants g WHERE g.actor_id=$7 AND g.case_id=care_cases.id AND g.role='居督' AND g.permission='write' AND g.revoked_at IS NULL AND g.effective_at<=now() AND (g.expires_at IS NULL OR g.expires_at>now())))"+
       " RETURNING id,case_key,revision,status,updated_at,patient_name,source_name,source_date,effective_date,content"+
       "), versioned AS ("+
       " INSERT INTO care_case_versions(case_id,revision,snapshot,actor_id)"+
