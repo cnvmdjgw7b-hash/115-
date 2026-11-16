@@ -29,7 +29,30 @@ export default async function(req,res){
   const expected=Number.isInteger(b.expected_revision)?b.expected_revision:0;
   if(expected<0 || expected>100000) return send(res,400,{error:"invalid_revision"});
   const packed=JSON.stringify(content);
-  if(expected===0)return send(res,403,{error:"use_v1_case_creation"});
+  if(expected===0){
+    try{
+      const q=await db.query(
+        "WITH actor_role AS (SELECT role FROM yhn_member_roles WHERE actor_id=$7 AND enabled=true AND role IN ('居督','機構主管')),"+
+        " created AS (INSERT INTO care_cases(case_key,patient_name,source_name,source_date,effective_date,content,status,updated_by,revision)"+
+        " SELECT $1,$2,$3,$4,$5,$6::jsonb,'草稿',$7,1 FROM actor_role ON CONFLICT(case_key) DO NOTHING"+
+        " RETURNING id,case_key,patient_name,source_name,source_date,effective_date,content,status,revision,updated_at),"+
+        " owner AS (INSERT INTO yhn_isolated_access_grants(actor_id,role,case_id,permission,effective_at,approved_by,reason,grant_type)"+
+        " SELECT $7,'居督',created.id,p.permission,now(),'role-case-creation','新建個案主責','assignment'"+
+        " FROM created CROSS JOIN (VALUES('read'),('write')) p(permission)"+
+        " WHERE EXISTS(SELECT 1 FROM actor_role WHERE role='居督') RETURNING case_id),"+
+        " versioned AS (INSERT INTO care_case_versions(case_id,revision,snapshot,actor_id)"+
+        " SELECT id,revision,jsonb_build_object('case_key',case_key,'patient_name',patient_name,'source_name',source_name,"+
+        " 'source_date',source_date,'effective_date',effective_date,'content',content,'status',status),$7 FROM created RETURNING id),"+
+        " logged AS (INSERT INTO care_case_audit(actor_id,action,case_id,details)"+
+        " SELECT $7,'draft.created',id,jsonb_build_object('revision',revision,'source_name',source_name) FROM created RETURNING id)"+
+        " SELECT created.id,created.case_key,created.revision,created.status,created.updated_at FROM created"+
+        " LEFT JOIN (SELECT DISTINCT case_id FROM owner) o ON o.case_id=created.id",
+        [case_key.trim(),patient_name.trim(),source_name.trim(),source_date,effective_date,packed,actor]
+      );
+      if(!q.rows.length)return send(res,409,{error:"duplicate_case_code"});
+      return send(res,200,{saved:q.rows[0]});
+    }catch(e){return send(res,500,{error:"draft_save_failed"});}
+  }
   try{
     const q=await db.query(
       "WITH saved AS ("+
