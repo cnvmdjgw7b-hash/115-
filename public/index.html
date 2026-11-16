@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#173b58">
+<title>永護寧｜家電訪與服務稽核整合台</title>
+<link rel="stylesheet" href="/style.css">
+<script defer src="/vendor/xlsx.full.min.js"></script><script defer src="/vendor/pdf.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">永</span><div><strong>永護寧</strong><small>家電訪與服務稽核整合台</small></div></div>
+  <div class="top-right"><span class="privacy"><i></i>私人測試版・需督導審核</span><button id="testBtn" class="outline">系統自我檢查</button></div>
+</header>
+<main>
+  <section class="hero">
+    <div><div class="eyebrow">SUPERVISOR WORKBENCH</div><h1>照顧計畫匯入與紀錄整理</h1><p>先看清來源、逐段修正，再保存或列印。未辨識內容會標示缺口，不會自動補寫。</p></div>
+    <div class="hero-actions"><a class="button ghost" href="/audit/">服務時間稽核</a><a class="button ghost" href="/templates/永護寧空白照顧計畫.xlsx" download>下載空白仁寶表格</a><button id="printBtn" class="button primary">列印目前草稿</button></div>
+  </section>
+  <section class="statusbar" aria-live="polite"><span class="status-dot"></span><span id="status">尚未匯入資料。資料需人工核對後才可保存。</span><span id="saveState" class="save-state">未保存</span></section>
+  <div class="layout">
+    <aside class="panel import-panel">
+      <div class="panel-head"><span class="step">01</span><div><h2>匯入來源資料</h2><small>HTML・PDF・Excel・CSV・JSON</small></div></div>
+      <label class="dropzone" for="upload"><span class="upload-icon">↑</span><strong>選擇檔案</strong><small>支援 .html、.pdf、.xlsx、.csv、.json、.txt，單檔 20 MB</small><input id="upload" type="file" accept=".html,.htm,.pdf,.xlsx,.xls,.csv,.json,.txt"></label>
+      <div class="form-grid">
+        <label>個案姓名<input id="name" autocomplete="off" placeholder="請核對後輸入"></label>
+        <label>機構識別碼<input id="key" autocomplete="off" placeholder="避免使用身分證號"></label>
+        <label class="span2">來源檔名<input id="sourceName" readonly placeholder="匯入後自動帶入"></label>
+        <label>來源日期<input id="sourceDate" type="date"></label>
+        <label>生效日期<input id="effectiveDate" type="date"></label>
+      </div>
+      <div class="preview-box"><div class="preview-title"><strong>匯入預覽</strong><span id="sourceMeta">尚無檔案</span></div><div id="previewText" class="preview-text">選取檔案後，內容會先在此預覽；不會自動寫入資料庫。</div><div id="gapList" class="gaps"></div></div>
+      <div class="consent"><label><input id="aiConsent" type="checkbox"><span>已自行核對並遮蔽可識別資料，且同意將來源文字傳送 AI 產生草稿。AI 功能預設關閉。</span></label></div>
+      <button id="generateBtn" class="button full">依來源產生六段草稿</button>
+      <button id="saveBtn" class="button full secondary">保存為機構草稿</button>
+      <button id="exportBtn" class="button full secondary">匯出填寫版 Excel</button>
+      <div class="fineprint">未按「保存」前，來源只留在此瀏覽器記憶體。手寫或掃描 PDF 無法擷取時會標示資料缺口，不自行判讀。</div>
+      <div class="saved-box"><div class="saved-head"><h3>已保存草稿</h3><button id="refreshBtn" class="text-button">重新整理</button></div><input id="searchSaved" class="search" placeholder="搜尋個案姓名或識別碼"><div id="savedList" class="saved-list"><span class="muted">尚未載入</span></div></div>
+    </aside>
+    <section class="panel editor-panel">
+      <div class="panel-head"><span class="step">02</span><div><h2>逐段檢核與修正</h2><small>資料依原來源整理；空白處請人工補充或保留缺口</small></div></div>
+      <div id="tabs" class="tabs" role="tablist"></div>
+      <div class="editor-heading"><div><span class="eyebrow">CURRENT SECTION</span><h2 id="heading">一、個案基本資料</h2></div><span id="charCount">0 字</span></div>
+      <textarea id="editor" placeholder="匯入來源後先核對；可直接編輯本段內容。缺少的事實不要推測補寫。"></textarea>
+      <div class="editor-footer"><span id="sourceHint">來源：尚未選取</span><button id="clearSection" class="text-button">清除此段</button></div>
+      <div class="review-notice"><strong>保存前請確認</strong><span>姓名、來源檔名、來源日期、生效日期與六段內容；同一識別碼再次保存會建立新版本，不會直接覆蓋舊版。</span></div>
+    </section>
+  </div>
+  <section id="testPanel" class="panel test-panel">
+    <div class="panel-head"><span class="step">03</span><div><h2>空資料驗收</h2><small>不建立假個案、不寫入測試資料</small></div><button id="runTests" class="button secondary">開始檢查</button></div>
+    <div id="testResults" class="test-results"><span class="muted">檢查登入閘門、API 回應、空白資料庫及空白表格下載。</span></div>
+  </section>
+  <section class="print-sheet" id="printSheet">
+    <div class="print-head"><h1>花蓮縣私立永護寧居家長照機構</h1><h2>居家服務個案照顧計畫（草稿）</h2><div id="printMeta"></div></div>
+    <div id="printContent"></div>
+    <p class="print-warning">草稿未經督導審核，請核對來源及實際資料後再正式歸檔。</p>
+  </section>
+</main>
+<footer>永護寧內部測試版｜個案資料僅供授權人員於受控環境處理</footer>
+<script type="module" src="/app.js"></script>
+</body></html>
