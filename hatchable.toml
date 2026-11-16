@@ -1,3 +1,13 @@
 [ai]
 required = true
-description = "將去識別化家電訪事實整理為台灣居督紀錄，需設定 AI 供應商金鑰。"
+providers = ["openai"]
+description = "仁寶照顧計畫 AI 草稿產製"
+
+[[api]]
+name = "notion"
+auth = "api_key"
+base_url = "https://api.notion.com"
+key_header = "Authorization"
+key_prefix = "Bearer "
+required = false
+description = "選配 Notion 個案資料庫同步"

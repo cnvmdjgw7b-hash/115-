@@ -1,0 +1,1 @@
+export const access="member";export const methods=["GET"];export default async function(req,res){res.json({ok:true,platform:"Hatchable",environment:"private",state:"測試版"});}
