@@ -28,15 +28,14 @@ export default async function(req,res){
   const expected=Number.isInteger(b.expected_revision)?b.expected_revision:0;
   if(expected<0 || expected>100000) return send(res,400,{error:"invalid_revision"});
   const packed=JSON.stringify(content);
+  if(expected===0)return send(res,403,{error:"use_v1_case_creation"});
   try{
     const q=await db.query(
       "WITH saved AS ("+
-      " INSERT INTO care_cases(case_key,patient_name,source_name,source_date,effective_date,content,status,updated_by,revision)"+
-      " VALUES($1,$2,$3,$4,$5,$6::jsonb,'草稿',$7,1)"+
-      " ON CONFLICT(case_key) DO UPDATE SET patient_name=EXCLUDED.patient_name,source_name=EXCLUDED.source_name,"+
-      " source_date=EXCLUDED.source_date,effective_date=EXCLUDED.effective_date,content=EXCLUDED.content,status='草稿',"+
-      " updated_by=EXCLUDED.updated_by,updated_at=now(),revision=care_cases.revision+1"+
-      " WHERE care_cases.revision=$8 AND (EXISTS(SELECT 1 FROM yhn_member_roles r WHERE r.actor_id=$7 AND r.enabled=true AND r.role='機構主管') OR EXISTS(SELECT 1 FROM yhn_isolated_access_grants g WHERE g.actor_id=$7 AND g.case_id=care_cases.id AND g.role='居督' AND g.permission='write' AND g.revoked_at IS NULL AND g.effective_at<=now() AND (g.expires_at IS NULL OR g.expires_at>now())))"+
+      " UPDATE care_cases SET patient_name=$2,source_name=$3,"+
+      " source_date=$4,effective_date=$5,content=$6::jsonb,status='草稿',"+
+      " updated_by=$7,updated_at=now(),revision=care_cases.revision+1"+
+      " WHERE care_cases.case_key=$1 AND care_cases.revision=$8 AND (EXISTS(SELECT 1 FROM yhn_member_roles r WHERE r.actor_id=$7 AND r.enabled=true AND r.role='機構主管') OR EXISTS(SELECT 1 FROM yhn_isolated_access_grants g WHERE g.actor_id=$7 AND g.case_id=care_cases.id AND g.role='居督' AND g.permission='write' AND g.revoked_at IS NULL AND g.effective_at<=now() AND (g.expires_at IS NULL OR g.expires_at>now())))"+
       " RETURNING id,case_key,revision,status,updated_at,patient_name,source_name,source_date,effective_date,content"+
       "), versioned AS ("+
       " INSERT INTO care_case_versions(case_id,revision,snapshot,actor_id)"+
